@@ -35,7 +35,7 @@ jobs:
 
       - name: Build macOS application
         if: runner.os == 'macOS'
-        run: python -m PyInstaller --clean --windowed --name CelloTrainer --osx-bundle-identifier com.cyb​​eert.cellotrainer cello_trainer_v6.5.py
+        run: python -m PyInstaller --clean --windowed --name CelloTrainer --osx-bundle-identifier com.cybeert.cellotrainer cello_trainer_v6.5.py
 
       - name: Upload Windows build
         if: runner.os == 'Windows'
@@ -45,12 +45,6 @@ jobs:
           path: dist/CelloTrainer.exe
 
       - name: Package macOS application
-        if: runner.os == 'macOS'
-        run: |
-          cd dist
-          zip -r CelloTrainer-macOS.zip CelloTrainer.app
-
-           - name: Package macOS application
         if: runner.os == 'macOS'
         run: |
           cd dist
