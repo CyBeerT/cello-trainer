@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cello Sight-Reading Trainer v6.5 — Python 3.9+ (Tkinter, standard library only).
+"""Cello Sight-Reading Trainer v6.5.1 — Python 3.9+ (Tkinter, standard library only).
 
 Run with: python cello_trainer.py
 
@@ -9,8 +9,14 @@ and refine POSITION_RANGES against your own Cello Companion chart before relying
 on it for advanced/extended positions.
 """
 import math, os, random, shutil, struct, subprocess, sys, tempfile, threading, time, wave
+import json, re, urllib.request, urllib.error, webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox
+
+APP_VERSION = "6.5.1"
+GITHUB_REPO = "CyBeerT/cello-trainer"
+GITHUB_RELEASES_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 
 A4_HZ = 443.0
 STRINGS = [("A", 57), ("D", 50), ("G", 43), ("C", 36)]  # top to bottom
@@ -84,7 +90,10 @@ class TonePlayer:
 class CelloTrainer:
     def __init__(self, root):
         self.root = root
-        root.title("Cello Sight-Reading Trainer v6.5")
+        root.title(f"Cello Sight-Reading Trainer v{APP_VERSION}")
+        self._update_check_in_progress = False
+        self._update_checked_this_session = False
+        self._install_help_menu()
         root.geometry("1100x790")
         # Permit smaller displays; scrollable pages handle the remaining content.
         root.minsize(720, 480)
@@ -101,6 +110,106 @@ class CelloTrainer:
         self.answered = False
         self.locations = []
         self.show_settings()
+        # Check quietly in the background; offline use must never be blocked.
+        root.after(1500, lambda: self.check_for_updates(manual=False))
+
+    def _install_help_menu(self):
+        menu_bar = tk.Menu(self.root)
+        help_menu = tk.Menu(menu_bar, tearoff=0)
+        help_menu.add_command(label="Check for updates…", command=lambda: self.check_for_updates(manual=True))
+        help_menu.add_separator()
+        help_menu.add_command(label="About Cello Trainer", command=self.show_about)
+        menu_bar.add_cascade(label="Help", menu=help_menu)
+        self.root.config(menu=menu_bar)
+
+    def show_about(self):
+        messagebox.showinfo(
+            "About Cello Trainer",
+            f"Cello Sight-Reading Trainer\nVersion {APP_VERSION}\n\n"
+            "Update checks use the public GitHub releases for CyBeerT/cello-trainer.\n"
+            "Updates are never installed automatically."
+        )
+
+    @staticmethod
+    def _version_key(version_text):
+        """Convert a release tag such as v6.5.0 into a comparable numeric tuple."""
+        text = str(version_text).strip().lstrip("vV")
+        match = re.match(r"^(\d+(?:\.\d+)*)", text)
+        if not match:
+            return ()
+        return tuple(int(part) for part in match.group(1).split("."))
+
+    def check_for_updates(self, manual=True):
+        if self._update_check_in_progress:
+            if manual:
+                messagebox.showinfo("Check for updates", "An update check is already in progress.")
+            return
+        self._update_check_in_progress = True
+        if manual:
+            self.root.config(cursor="watch")
+
+        def worker():
+            result = None
+            error = None
+            try:
+                request = urllib.request.Request(
+                    GITHUB_RELEASES_API,
+                    headers={"Accept": "application/vnd.github+json", "User-Agent": "Cello-Trainer-Updater"},
+                )
+                with urllib.request.urlopen(request, timeout=6) as response:
+                    release = json.loads(response.read().decode("utf-8"))
+                if release.get("draft") or release.get("prerelease"):
+                    raise ValueError("GitHub did not return a stable public release.")
+                tag = str(release.get("tag_name", "")).strip()
+                latest_key = self._version_key(tag)
+                current_key = self._version_key(APP_VERSION)
+                if not latest_key:
+                    raise ValueError("The latest release has an unrecognized version tag.")
+                # Pad tuples so 6.5 and 6.5.0 compare as the same version.
+                size = max(len(latest_key), len(current_key))
+                latest_key += (0,) * (size - len(latest_key))
+                current_key += (0,) * (size - len(current_key))
+                result = {
+                    "update_available": latest_key > current_key,
+                    "latest_version": tag,
+                    "url": release.get("html_url") or GITHUB_RELEASES_PAGE,
+                    "notes": str(release.get("body") or "").strip(),
+                }
+            except Exception as exc:
+                error = str(exc)
+            self.root.after(0, lambda: self._finish_update_check(result, error, manual))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_update_check(self, result, error, manual):
+        self._update_check_in_progress = False
+        self._update_checked_this_session = True
+        try:
+            self.root.config(cursor="")
+        except tk.TclError:
+            pass
+        if error:
+            if manual:
+                messagebox.showwarning(
+                    "Unable to check for updates",
+                    "Cello Trainer could not contact GitHub. You can keep using the program and try again later.\n\n"
+                    f"Details: {error}"
+                )
+            return
+        if not result:
+            return
+        if result["update_available"]:
+            notes = result["notes"]
+            if len(notes) > 1000:
+                notes = notes[:1000].rstrip() + "…"
+            message = f"A newer version ({result['latest_version']}) is available.\n\n"
+            if notes:
+                message += f"Release notes:\n{notes}\n\n"
+            message += "Open the official GitHub release page to download it?\n\nThe update will not be installed automatically."
+            if messagebox.askyesno("Cello Trainer update available", message):
+                webbrowser.open(result["url"])
+        elif manual:
+            messagebox.showinfo("Check for updates", f"You're using the latest version (v{APP_VERSION}).")
 
     def clear(self):
         for w in self.root.winfo_children(): w.destroy()
