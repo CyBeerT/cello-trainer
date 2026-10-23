@@ -1,0 +1,49 @@
+
+name: Build Cello Trainer for Windows and macOS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: CelloTrainer-Windows
+          - os: macos-latest
+            artifact: CelloTrainer-macOS
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Build application
+        run: python -m PyInstaller --clean --onefile --windowed --name CelloTrainer cello_trainer_v6.5.py
+
+      - name: Upload Windows build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CelloTrainer-Windows
+          path: dist/CelloTrainer.exe
+
+      - name: Upload macOS build
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CelloTrainer-macOS
+          path: dist/CelloTrainer
