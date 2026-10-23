@@ -212,7 +212,11 @@ class CelloTrainer:
             messagebox.showinfo("Check for updates", f"You're using the latest version (v{APP_VERSION}).")
 
     def clear(self):
-        for w in self.root.winfo_children(): w.destroy()
+        # The Help menu is a child of the root window too, so clear() destroys it
+        # along with the page widgets. Rebuild it after clearing the page.
+        for w in self.root.winfo_children():
+            w.destroy()
+        self._install_help_menu()
 
     def show_settings(self):
         self.clear()
