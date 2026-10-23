@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cello Sight-Reading Trainer v6.3 — Python 3.9+ (Tkinter, standard library only).
+"""Cello Sight-Reading Trainer v6.5 — Python 3.9+ (Tkinter, standard library only).
 
 Run with: python cello_trainer.py
 
@@ -84,7 +84,7 @@ class TonePlayer:
 class CelloTrainer:
     def __init__(self, root):
         self.root = root
-        root.title("Cello Sight-Reading Trainer v6.1")
+        root.title("Cello Sight-Reading Trainer v6.5")
         root.geometry("1100x790")
         # Permit smaller displays; scrollable pages handle the remaining content.
         root.minsize(720, 480)
