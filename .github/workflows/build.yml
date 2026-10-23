@@ -50,6 +50,12 @@ jobs:
           cd dist
           zip -r CelloTrainer-macOS.zip CelloTrainer.app
 
+           - name: Package macOS application
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r CelloTrainer-macOS.zip CelloTrainer.app
+
       - name: Upload macOS build
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
