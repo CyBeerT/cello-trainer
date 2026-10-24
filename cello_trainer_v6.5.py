@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cello Sight-Reading Trainer v6.5.1 — Python 3.9+ (Tkinter, standard library only).
+"""Cello Sight-Reading Trainer v6.5.2 — Python 3.9+ (Tkinter, standard library only).
 
 Run with: python cello_trainer.py
 
@@ -13,7 +13,7 @@ import json, re, urllib.request, urllib.error, webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-APP_VERSION = "6.5.1"
+APP_VERSION = "6.5.2"
 GITHUB_REPO = "CyBeerT/cello-trainer"
 GITHUB_RELEASES_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
@@ -478,6 +478,11 @@ class CelloTrainer:
         if not hasattr(self, "board") or not self.board.winfo_exists(): return
         c = self.board; c.delete("all")
         w,h,left,right,top,bottom = self.geometry()
+        # The first question can be generated before Tkinter finishes laying out
+        # the widgets. If the board has since resized, refresh the saved answer
+        # coordinates so highlighted markers use the current canvas geometry.
+        if self.answered and self.target is not None:
+            self.locations = self.find_locations(self.target)
         center = (top+bottom)/2
         # Dark display surround.
         c.create_rectangle(18, 12, w-18, h-12, fill="#2a201c", outline="#80624e", width=2)
