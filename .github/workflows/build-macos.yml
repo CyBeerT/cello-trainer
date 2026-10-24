@@ -31,7 +31,7 @@ jobs:
             --clean \
             --windowed \
             --name CelloTrainer \
-            cello_trainer_v6.5.2.py
+            cello_trainer_v6.5.py
 
       - name: Package macOS app
         run: |
