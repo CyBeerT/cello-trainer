@@ -1,5 +1,4 @@
-
-name: Build Cello Trainer for Windows and macOS
+name: Build Cello Trainer for Linux, Windows and macOS
 
 on:
   workflow_dispatch:
@@ -12,10 +11,15 @@ jobs:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
+          - os: ubuntu-latest
+            platform: Linux
           - os: windows-latest
+            platform: Windows
           - os: macos-latest
+            platform: macOS
 
     steps:
       - name: Check out repository
@@ -24,35 +28,70 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install PyInstaller
-        run: python -m pip install --upgrade pip pyinstaller
+      - name: Install build tools
+        run: python -m pip install --upgrade pip pyinstaller packaging
 
-      - name: Build Windows executable
+      - name: Find newest application source file
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from packaging.version import Version, InvalidVersion
+          import re
+          import os
+          import sys
+
+          candidates = []
+          for path in Path(".").glob("cello_trainer_v*.py"):
+              match = re.fullmatch(r"cello_trainer_v(.+)\.py", path.name)
+              if not match:
+                  continue
+              try:
+                  version = Version(match.group(1))
+              except InvalidVersion:
+                  print(f"Skipping unrecognised version: {path.name}")
+                  continue
+              candidates.append((version, path))
+
+          if not candidates:
+              print("No file matching cello_trainer_v*.py was found.")
+              sys.exit(1)
+
+          version, source = max(candidates, key=lambda item: item[0])
+          print(f"Selected source: {source.name} (version {version})")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"SOURCE_FILE={source.name}\n")
+          PY
+
+      - name: Build application
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name CelloTrainer "$SOURCE_FILE"
+
+      - name: Package Linux build
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          zip CelloTrainer-Linux.zip CelloTrainer
+
+      - name: Package Windows build
         if: runner.os == 'Windows'
-        run: python -m PyInstaller --clean --onefile --windowed --name CelloTrainer cello_trainer_v6.5.py
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/CelloTrainer.exe -DestinationPath dist/CelloTrainer-Windows.zip -Force
 
-      - name: Build macOS application
-        if: runner.os == 'macOS'
-        run: python -m PyInstaller --clean --windowed --name CelloTrainer --osx-bundle-identifier com.cybeert.cellotrainer cello_trainer_v6.5.py
-
-      - name: Upload Windows build
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: CelloTrainer-Windows
-          path: dist/CelloTrainer.exe
-
-      - name: Package macOS application
+      - name: Package macOS build
         if: runner.os == 'macOS'
         run: |
           cd dist
           zip -r CelloTrainer-macOS.zip CelloTrainer.app
 
-      - name: Upload macOS build
-        if: runner.os == 'macOS'
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CelloTrainer-macOS
-          path: dist/CelloTrainer-macOS.zip
+          name: CelloTrainer-${{ matrix.platform }}
+          path: dist/CelloTrainer-*.zip
+          if-no-files-found: error
+          retention-days: 14
